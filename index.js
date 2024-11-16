@@ -1,6 +1,5 @@
 const express = require('express');
 const line = require('@line/bot-sdk');
-const axios = require('axios');
 
 const app = express();
 app.use(express.json());
@@ -111,22 +110,10 @@ function handleEvent(event) {
 
       return client.replyMessage(event.replyToken, [
         flexMessage,
-        { type: 'text', text: 'กำลังประมวลผล รอสักครู่...' },
+        { type: 'text', text: 'การกรอกข้อมูลเสร็จสิ้น! ขอบคุณที่ใช้บริการ' },
       ])
-      .then(() => {
-        // ส่งข้อมูลไปบันทึกใน Google Sheets
-        return axios.post(process.env.GOOGLE_SCRIPT_URL, userInputs[userId]);
-      })
-      .then(() => {
-        // ส่งสติ๊กเกอร์ตอบกลับเมื่อบันทึกข้อมูลเสร็จ
-        client.pushMessage(userId, {
-          type: 'sticker',
-          packageId: '1',
-          stickerId: '1',
-        });
-      })
       .catch((err) => {
-        console.error('Error processing user input or sending data:', err);
+        console.error('Error replying with Flex Message:', err);
       })
       .finally(() => {
         // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
