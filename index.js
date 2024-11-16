@@ -19,6 +19,11 @@ const client = new Client(config);
 
 let userInputs = {}; // เก็บข้อมูลผู้ใช้ชั่วคราว
 
+// เพิ่ม Route สำหรับ root URL เพื่อแสดงข้อความเมื่อเข้าถึงผ่านเบราว์เซอร์
+app.get('/', (req, res) => {
+  res.send('LINE Bot Server is running.');
+});
+
 // Webhook handling
 app.post('/webhook', middleware(config), (req, res) => {
   try {
@@ -55,55 +60,55 @@ async function handleEvent(event) {
 
     // ตรวจสอบขั้นตอนการกรอกข้อมูล
     if (userInputs[userId]) {
-      if (userInputs[userId].step === 1) {
-        userInputs[userId].sugarLevel = userInput;
-        userInputs[userId].step = 2;
-        console.log(`User ${userId} entered sugar level: ${userInput}`);
-        return client.replyMessage(event.replyToken, {
-          type: 'text',
-          text: 'กรุณากรอกค่าความดัน',
-        });
-      } else if (userInputs[userId].step === 2) {
-        userInputs[userId].bloodPressure = userInput;
-        userInputs[userId].step = 3;
-        console.log(`User ${userId} entered blood pressure: ${userInput}`);
-        return client.replyMessage(event.replyToken, {
-          type: 'text',
-          text: 'กรุณากรอกค่าน้ำหนัก',
-        });
-      } else if (userInputs[userId].step === 3) {
-        userInputs[userId].weight = userInput;
-        userInputs[userId].step = 4;
-        console.log(`User ${userId} entered weight: ${userInput}`);
-        return client.replyMessage(event.replyToken, {
-          type: 'text',
-          text: 'กรุณากรอกส่วนสูง',
-        });
-      } else if (userInputs[userId].step === 4) {
-        userInputs[userId].height = userInput;
-        console.log(`User ${userId} entered height: ${userInput}`);
+      try {
+        if (userInputs[userId].step === 1) {
+          userInputs[userId].sugarLevel = userInput;
+          userInputs[userId].step = 2;
+          console.log(`User ${userId} entered sugar level: ${userInput}`);
+          return client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: 'กรุณากรอกค่าความดัน',
+          });
+        } else if (userInputs[userId].step === 2) {
+          userInputs[userId].bloodPressure = userInput;
+          userInputs[userId].step = 3;
+          console.log(`User ${userId} entered blood pressure: ${userInput}`);
+          return client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: 'กรุณากรอกค่าน้ำหนัก',
+          });
+        } else if (userInputs[userId].step === 3) {
+          userInputs[userId].weight = userInput;
+          userInputs[userId].step = 4;
+          console.log(`User ${userId} entered weight: ${userInput}`);
+          return client.replyMessage(event.replyToken, {
+            type: 'text',
+            text: 'กรุณากรอกส่วนสูง',
+          });
+        } else if (userInputs[userId].step === 4) {
+          userInputs[userId].height = userInput;
+          console.log(`User ${userId} entered height: ${userInput}`);
 
-        // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
-        const flexMessage = {
-          type: 'flex',
-          altText: 'ข้อมูลที่คุณกรอก',
-          contents: {
-            type: 'bubble',
-            body: {
-              type: 'box',
-              layout: 'vertical',
-              contents: [
-                { type: 'text', text: 'ข้อมูลที่คุณกรอก', weight: 'bold', size: 'lg' },
-                { type: 'text', text: `ค่าน้ำตาล: ${userInputs[userId].sugarLevel}` },
-                { type: 'text', text: `ค่าความดัน: ${userInputs[userId].bloodPressure}` },
-                { type: 'text', text: `น้ำหนัก: ${userInputs[userId].weight}` },
-                { type: 'text', text: `ส่วนสูง: ${userInputs[userId].height}` },
-              ],
+          // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
+          const flexMessage = {
+            type: 'flex',
+            altText: 'ข้อมูลที่คุณกรอก',
+            contents: {
+              type: 'bubble',
+              body: {
+                type: 'box',
+                layout: 'vertical',
+                contents: [
+                  { type: 'text', text: 'ข้อมูลที่คุณกรอก', weight: 'bold', size: 'lg' },
+                  { type: 'text', text: `ค่าน้ำตาล: ${userInputs[userId].sugarLevel}` },
+                  { type: 'text', text: `ค่าความดัน: ${userInputs[userId].bloodPressure}` },
+                  { type: 'text', text: `น้ำหนัก: ${userInputs[userId].weight}` },
+                  { type: 'text', text: `ส่วนสูง: ${userInputs[userId].height}` },
+                ],
+              },
             },
-          },
-        };
+          };
 
-        try {
           await client.replyMessage(event.replyToken, [
             flexMessage,
             { type: 'text', text: 'กำลังประมวลผล รอสักครู่...' },
@@ -131,9 +136,9 @@ async function handleEvent(event) {
 
           // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
           delete userInputs[userId];
-        } catch (error) {
-          console.error('Error during processing or sending data:', error);
         }
+      } catch (error) {
+        console.error('Error during user input processing:', error);
       }
     }
   }
