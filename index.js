@@ -21,12 +21,19 @@ let userInputs = {}; // เก็บข้อมูลผู้ใช้ชั�
 
 // Webhook handling
 app.post('/webhook', middleware(config), (req, res) => {
-  Promise.all(req.body.events.map(handleEvent))
-    .then(() => res.status(200).send('OK'))
-    .catch((err) => {
-      console.error('Error handling webhook event:', err);
-      res.status(500).send('Internal Server Error');
-    });
+  try {
+    Promise.all(req.body.events.map(handleEvent))
+      .then(() => {
+        res.status(200).send('OK');
+      })
+      .catch((err) => {
+        console.error('Error during event handling:', err);
+        res.status(500).send('Internal Server Error');
+      });
+  } catch (error) {
+    console.error('Unhandled error:', error);
+    res.status(500).send('Internal Server Error');
+  }
 });
 
 async function handleEvent(event) {
@@ -39,6 +46,7 @@ async function handleEvent(event) {
     // เริ่มต้นการกรอกข้อมูลจากผู้ใช้
     if (userInput === 'เริ่มต้นกรอกข้อมูล') {
       userInputs[userId] = { step: 1 };
+      console.log(`User ${userId} started input process.`);
       return client.replyMessage(event.replyToken, {
         type: 'text',
         text: 'กรุณากรอกค่าน้ำตาล',
@@ -50,6 +58,7 @@ async function handleEvent(event) {
       if (userInputs[userId].step === 1) {
         userInputs[userId].sugarLevel = userInput;
         userInputs[userId].step = 2;
+        console.log(`User ${userId} entered sugar level: ${userInput}`);
         return client.replyMessage(event.replyToken, {
           type: 'text',
           text: 'กรุณากรอกค่าความดัน',
@@ -57,6 +66,7 @@ async function handleEvent(event) {
       } else if (userInputs[userId].step === 2) {
         userInputs[userId].bloodPressure = userInput;
         userInputs[userId].step = 3;
+        console.log(`User ${userId} entered blood pressure: ${userInput}`);
         return client.replyMessage(event.replyToken, {
           type: 'text',
           text: 'กรุณากรอกค่าน้ำหนัก',
@@ -64,12 +74,14 @@ async function handleEvent(event) {
       } else if (userInputs[userId].step === 3) {
         userInputs[userId].weight = userInput;
         userInputs[userId].step = 4;
+        console.log(`User ${userId} entered weight: ${userInput}`);
         return client.replyMessage(event.replyToken, {
           type: 'text',
           text: 'กรุณากรอกส่วนสูง',
         });
       } else if (userInputs[userId].step === 4) {
         userInputs[userId].height = userInput;
+        console.log(`User ${userId} entered height: ${userInput}`);
 
         // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
         const flexMessage = {
@@ -91,7 +103,6 @@ async function handleEvent(event) {
           },
         };
 
-        // ส่ง Flex Message และข้อความแจ้งเตือนการประมวลผล
         try {
           await client.replyMessage(event.replyToken, [
             flexMessage,
@@ -99,6 +110,7 @@ async function handleEvent(event) {
           ]);
 
           // บันทึกข้อมูลลงใน Google Sheets
+          console.log(`Sending data to Google Sheets for user ${userId}`);
           await axios.post(googleScriptUrl, {
             userId: userId,
             sugarLevel: userInputs[userId].sugarLevel,
@@ -115,10 +127,12 @@ async function handleEvent(event) {
             stickerId: '1',
           });
 
+          console.log(`Data processing complete for user ${userId}`);
+
           // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
           delete userInputs[userId];
         } catch (error) {
-          console.error('Error processing user input or sending data:', error);
+          console.error('Error during processing or sending data:', error);
         }
       }
     }
