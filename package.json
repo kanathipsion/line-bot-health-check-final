@@ -1,7 +1,7 @@
 {
   "name": "line-bot-health-check",
   "version": "1.0.0",
-  "description": "A LINE bot for health data collection",
+  "description": "A LINE bot for health data collection and analysis",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -12,5 +12,9 @@
     "@line/bot-sdk": "^7.4.0",
     "axios": "^0.21.1",
     "dotenv": "^10.0.0"
-  }
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "license": "MIT"
 }
