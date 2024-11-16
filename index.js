@@ -16,112 +16,33 @@ const config = {
 
 const client = new line.Client(config);
 
-let userInputs = {}; // ใช้เก็บข้อมูลผู้ใช้ชั่วคราว
-
 // เพิ่ม route สำหรับการตอบสนอง GET ที่ root URL
 app.get('/', (req, res) => {
-  res.send('Hello! This is the LINE Bot Health Check server.');
+  res.send('Hello! This is the LINE Bot server for basic connection testing.');
 });
 
+// รับ POST request จาก LINE Webhook
 app.post('/webhook', line.middleware(config), (req, res) => {
   const events = req.body.events;
-  Promise.all(events.map(handleEvent))
-    .then(() => res.status(200).send('OK'))
-    .catch((err) => {
-      console.error('Error handling webhook event:', err);
-      res.status(500).send('Internal Server Error');
-    });
-});
-
-function handleEvent(event) {
-  const userId = event.source.userId;
-
-  if (event.type !== 'message' || event.message.type !== 'text') {
-    // Return a resolved promise to avoid affecting other events
-    return Promise.resolve(null);
-  }
-
-  const userInput = event.message.text.toLowerCase(); // แปลงข้อความเป็นตัวพิมพ์เล็กเพื่อเปรียบเทียบง่ายขึ้น
-
-  // ตรวจสอบว่าเป็นข้อความเริ่มต้นที่กำหนดไว้
-  if (userInput === 'คำนวณผลสุขภาพ' || userInput === 'ผลสุขภาพ') {
-    // เริ่มต้นกระบวนการกรอกข้อมูล
-    userInputs[userId] = { step: 1 };
-    return client.replyMessage(event.replyToken, {
-      type: 'text',
-      text: 'กรุณากรอกค่าน้ำตาล',
-    }).catch((err) => {
-      console.error('Error replying message:', err);
-    });
-  }
-
-  // ตรวจสอบขั้นตอนการกรอกข้อมูล
-  if (userInputs[userId]) {
-    if (userInputs[userId].step === 1) {
-      userInputs[userId].sugarLevel = userInput;
-      userInputs[userId].step = 2;
+  if (events.length > 0) {
+    const event = events[0]; // รับ Event แรกเพื่อทดสอบ
+    if (event.type === 'message' && event.message.type === 'text') {
+      // ตอบกลับข้อความง่าย ๆ เพื่อทดสอบการเชื่อมต่อ
       return client.replyMessage(event.replyToken, {
         type: 'text',
-        text: 'กรุณากรอกค่าความดัน',
-      }).catch((err) => {
-        console.error('Error replying message:', err);
-      });
-    } else if (userInputs[userId].step === 2) {
-      userInputs[userId].bloodPressure = userInput;
-      userInputs[userId].step = 3;
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: 'กรุณากรอกค่าน้ำหนัก',
-      }).catch((err) => {
-        console.error('Error replying message:', err);
-      });
-    } else if (userInputs[userId].step === 3) {
-      userInputs[userId].weight = userInput;
-      userInputs[userId].step = 4;
-      return client.replyMessage(event.replyToken, {
-        type: 'text',
-        text: 'กรุณากรอกส่วนสูง',
-      }).catch((err) => {
-        console.error('Error replying message:', err);
-      });
-    } else if (userInputs[userId].step === 4) {
-      userInputs[userId].height = userInput;
-      userInputs[userId].step = 5;
-
-      // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
-      const flexMessage = {
-        type: 'flex',
-        altText: 'ข้อมูลที่คุณกรอก',
-        contents: {
-          type: 'bubble',
-          body: {
-            type: 'box',
-            layout: 'vertical',
-            contents: [
-              { type: 'text', text: 'ข้อมูลที่คุณกรอก', weight: 'bold', size: 'lg' },
-              { type: 'text', text: `ค่าน้ำตาล: ${userInputs[userId].sugarLevel}` },
-              { type: 'text', text: `ค่าความดัน: ${userInputs[userId].bloodPressure}` },
-              { type: 'text', text: `น้ำหนัก: ${userInputs[userId].weight}` },
-              { type: 'text', text: `ส่วนสูง: ${userInputs[userId].height}` },
-            ],
-          },
-        },
-      };
-
-      return client.replyMessage(event.replyToken, [
-        flexMessage,
-        { type: 'text', text: 'การกรอกข้อมูลเสร็จสิ้น! ขอบคุณที่ใช้บริการ' },
-      ])
-      .catch((err) => {
-        console.error('Error replying with Flex Message:', err);
+        text: 'การเชื่อมต่อสำเร็จ! ขอบคุณที่ส่งข้อความมาหาเรา',
       })
-      .finally(() => {
-        // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
-        delete userInputs[userId];
+      .then(() => {
+        res.status(200).send('OK');
+      })
+      .catch((err) => {
+        console.error('Error replying message:', err);
+        res.status(500).send('Internal Server Error');
       });
     }
   }
-}
+  res.status(200).send('No events to process');
+});
 
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
