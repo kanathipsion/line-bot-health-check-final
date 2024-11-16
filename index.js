@@ -1,61 +1,39 @@
-const express = require('express');
-const line = require('@line/bot-sdk');
-const axios = require('axios');
-
-const app = express();
-app.use(express.json());
-
-// Load environment variables
-require('dotenv').config();
-
-const config = {
-  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
-  channelSecret: process.env.LINE_CHANNEL_SECRET,
-};
-
-const client = new line.Client(config);
-
-let userInputs = {}; // ใช้เก็บข้อมูลผู้ใช้ชั่วคราว
-
-app.post('/webhook', line.middleware(config), (req, res) => {
-  const events = req.body.events;
-  events.forEach((event) => {
-    handleEvent(event);
-  });
-  res.status(200).send('OK');
-});
-
 function handleEvent(event) {
   const userId = event.source.userId;
 
   if (event.type === 'message' && event.message.type === 'text') {
-    const userInput = event.message.text;
+    const userInput = event.message.text.toLowerCase(); // แปลงข้อความเป็นตัวพิมพ์เล็กเพื่อเปรียบเทียบง่ายขึ้น
 
-    if (!userInputs[userId]) {
+    // ตรวจสอบว่าเป็นข้อความเริ่มต้นที่กำหนดไว้
+    if (userInput === 'คำนวณผลสุขภาพ' || userInput === 'ผลสุขภาพ') {
+      // เริ่มต้นกระบวนการกรอกข้อมูล
       userInputs[userId] = { step: 1 };
-      client.replyMessage(event.replyToken, {
+      return client.replyMessage(event.replyToken, {
         type: 'text',
         text: 'กรุณากรอกค่าน้ำตาล',
       });
-    } else {
+    }
+
+    // ตรวจสอบขั้นตอนการกรอกข้อมูล
+    if (userInputs[userId]) {
       if (userInputs[userId].step === 1) {
         userInputs[userId].sugarLevel = userInput;
         userInputs[userId].step = 2;
-        client.replyMessage(event.replyToken, {
+        return client.replyMessage(event.replyToken, {
           type: 'text',
           text: 'กรุณากรอกค่าความดัน',
         });
       } else if (userInputs[userId].step === 2) {
         userInputs[userId].bloodPressure = userInput;
         userInputs[userId].step = 3;
-        client.replyMessage(event.replyToken, {
+        return client.replyMessage(event.replyToken, {
           type: 'text',
           text: 'กรุณากรอกค่าน้ำหนัก',
         });
       } else if (userInputs[userId].step === 3) {
         userInputs[userId].weight = userInput;
         userInputs[userId].step = 4;
-        client.replyMessage(event.replyToken, {
+        return client.replyMessage(event.replyToken, {
           type: 'text',
           text: 'กรุณากรอกส่วนสูง',
         });
@@ -63,6 +41,7 @@ function handleEvent(event) {
         userInputs[userId].height = userInput;
         userInputs[userId].step = 5;
 
+        // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
         const flexMessage = {
           type: 'flex',
           altText: 'ข้อมูลที่คุณกรอก',
@@ -87,6 +66,7 @@ function handleEvent(event) {
           { type: 'text', text: 'กำลังประมวลผล รอสักครู่...' },
         ]);
 
+        // ส่งข้อมูลไปบันทึกใน Google Sheets
         axios.post(process.env.GOOGLE_SCRIPT_URL, userInputs[userId])
           .then(() => {
             client.pushMessage(userId, {
@@ -99,13 +79,9 @@ function handleEvent(event) {
             console.error('Error sending data to Google Sheets:', err);
           });
 
+        // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
         delete userInputs[userId];
       }
     }
   }
 }
-
-const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
