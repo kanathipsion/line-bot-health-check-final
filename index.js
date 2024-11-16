@@ -3,7 +3,6 @@ const { Client, middleware } = require('@line/bot-sdk');
 const axios = require('axios');
 
 const app = express();
-app.use(express.json());
 
 // LINE Bot configurations
 const config = {
@@ -17,129 +16,86 @@ const googleScriptUrl = process.env.GOOGLE_SCRIPT_URL;
 // Initialize LINE SDK client
 const client = new Client(config);
 
-let userInputs = {}; // เก็บข้อมูลผู้ใช้ชั่วคราว
-
-// เพิ่ม Route สำหรับ root URL เพื่อแสดงข้อความเมื่อเข้าถึงผ่านเบราว์เซอร์
-app.get('/', (req, res) => {
-  res.send('LINE Bot Server is running.');
-});
-
 // Webhook handling
 app.post('/webhook', middleware(config), (req, res) => {
-  try {
-    Promise.all(req.body.events.map(handleEvent))
-      .then(() => {
-        res.status(200).send('OK');
-      })
-      .catch((err) => {
-        console.error('Error during event handling:', err);
-        res.status(500).send('Internal Server Error');
-      });
-  } catch (error) {
-    console.error('Unhandled error:', error);
-    res.status(500).send('Internal Server Error');
-  }
+  Promise.all(req.body.events.map(handleEvent))
+    .then(result => res.json(result))
+    .catch(err => {
+      console.error('Error handling webhook event:', err);
+      res.status(500).end();
+    });
 });
 
-async function handleEvent(event) {
-  const userId = event.source.userId;
-
-  // ตรวจสอบว่าเป็นข้อความจากผู้ใช้หรือไม่
+// Function to handle LINE messages
+function handleEvent(event) {
   if (event.type === 'message' && event.message.type === 'text') {
-    const userInput = event.message.text.trim();
+    const userMessage = event.message.text;
 
-    // เริ่มต้นการกรอกข้อมูลจากผู้ใช้
-    if (userInput === 'เริ่มต้นกรอกข้อมูล') {
-      userInputs[userId] = { step: 1 };
-      console.log(`User ${userId} started input process.`);
+    // Extract values from message (example: "ค่าน้ำตาล 90 ค่าความดัน 110")
+    const sugarMatch = userMessage.match(/ค่าน้ำตาล\s*(\d+)/);
+    const pressureMatch = userMessage.match(/ค่าความดัน\s*(\d+)/);
+
+    if (sugarMatch && pressureMatch) {
+      const sugarLevel = parseInt(sugarMatch[1]);
+      const pressureLevel = parseInt(pressureMatch[1]);
+
+      let replyMessage = "";
+      let healthStatus = "";
+
+      // Check each condition and assign a specific message
+      if (sugarLevel <= 100 && pressureLevel <= 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ และ ค่าความดันของเติ้นอยู่ในเกณฑ์ปกติ โปรดรักษาสุขภาพต่อไปนะครับ';
+        healthStatus = 'ปกติ';
+      } else if (sugarLevel > 100 && pressureLevel <= 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้แล้วตะ ถ้าไม่ดีขึ้นแขบไปหาหมอนะ และ ค่าความดันของเติ้นอยู่ในเกณฑ์ปกติ โปรดรักษาสุขภาพต่อไปนะครับ';
+        healthStatus = 'น้ำตาลสูง';
+      } else if (sugarLevel < 70 && pressureLevel <= 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นต่ำเกินแล้วนิ และแนะนำให้รับกินอาหารที่มีน้ำตาล ถ้าไม่ดีขึ้นก็แขบไปหาหมอได้แล้ว และ ค่าความดันของเติ้นอยู่ในเกณฑ์ปกติ โปรดรักษาสุขภาพต่อไปนะครับ';
+        healthStatus = 'น้ำตาลต่ำ';
+      } else if (sugarLevel <= 100 && pressureLevel > 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ และ ค่าความดันของเติ้นสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็ม ถ้ามีอาการผิดปกติแขบไปหาหมอนะ';
+        healthStatus = 'ความดันสูง';
+      } else if (sugarLevel <= 100 && pressureLevel < 60) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นอยู่ในเกณฑ์ปกติ ผ่านๆ! โปรดรักษาสุขภาพให้ดีต่อไปนะครับ และ ค่าความดันต่ำ ควรนั่งพักและดื่มน้ำ ถ้าไม่ดีขึ้นควรไปหาหมอได้แล้ว';
+        healthStatus = 'ความดันต่ำ';
+      } else if (sugarLevel > 100 && pressureLevel > 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้และตะ ถ้าไม่ดีขึ้นแขบไปหาหมอนะ และ ค่าความดันของเติ้นสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็ม ถ้ามีอาการผิดปกติควรไปหาหมอนะ';
+        healthStatus = 'น้ำตาลและความดันสูง';
+      } else if (sugarLevel > 100 && pressureLevel < 60) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นสูงหว่าปกติจังนิ ออกกำลังกายควบคุมอาหารมั้งได้และตะ ถ้าไม่ดีขึ้นควรไปหาหมอนะ และ ค่าความดันต่ำ ควรนั่งพักและดื่มน้ำ ถ้าไม่ดีขึ้นแขบไปหาหมอได้แล้ว';
+        healthStatus = 'น้ำตาลสูงและความดันต่ำ';
+      } else if (sugarLevel < 70 && pressureLevel > 120) {
+        replyMessage = 'ค่าน้ำตาลของเติ้นต่ำเกินแล้วนิ และแนะนำให้รับกินอาหารที่มีน้ำตาล ถ้าไม่ดีขึ้นก็แขบไปหาหมอได้แล้ว และ ค่าความดันของเติ้นสูงเกินแล้วนิ ควรออกกำลังกายแล้วก็ลดอาหารเค็ม ถ้ามีอาการผิดปกติควรไปหาหมอนะ';
+        healthStatus = 'น้ำตาลต่ำและความดันสูง';
+      }
+
+      // Send data to Google Sheets (commented out for testing)
+      /*
+      axios.post(googleScriptUrl, {
+        userId: event.source.userId,
+        sugarLevel: sugarLevel,
+        pressureLevel: pressureLevel,
+        healthStatus: healthStatus,
+        advice: replyMessage,
+        timestamp: new Date().toLocaleString(),
+      }).then(() => {
+        console.log('Data sent to Google Sheets');
+      }).catch(error => {
+        console.error('Error sending data to Google Sheets:', error);
+      });
+      */
+
+      // Reply to user with the specific message
       return client.replyMessage(event.replyToken, {
         type: 'text',
-        text: 'กรุณากรอกค่าน้ำตาล',
+        text: replyMessage,
       });
-    }
-
-    // ตรวจสอบขั้นตอนการกรอกข้อมูล
-    if (userInputs[userId]) {
-      try {
-        if (userInputs[userId].step === 1) {
-          userInputs[userId].sugarLevel = userInput;
-          userInputs[userId].step = 2;
-          console.log(`User ${userId} entered sugar level: ${userInput}`);
-          return client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: 'กรุณากรอกค่าความดัน',
-          });
-        } else if (userInputs[userId].step === 2) {
-          userInputs[userId].bloodPressure = userInput;
-          userInputs[userId].step = 3;
-          console.log(`User ${userId} entered blood pressure: ${userInput}`);
-          return client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: 'กรุณากรอกค่าน้ำหนัก',
-          });
-        } else if (userInputs[userId].step === 3) {
-          userInputs[userId].weight = userInput;
-          userInputs[userId].step = 4;
-          console.log(`User ${userId} entered weight: ${userInput}`);
-          return client.replyMessage(event.replyToken, {
-            type: 'text',
-            text: 'กรุณากรอกส่วนสูง',
-          });
-        } else if (userInputs[userId].step === 4) {
-          userInputs[userId].height = userInput;
-          console.log(`User ${userId} entered height: ${userInput}`);
-
-          // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
-          const flexMessage = {
-            type: 'flex',
-            altText: 'ข้อมูลที่คุณกรอก',
-            contents: {
-              type: 'bubble',
-              body: {
-                type: 'box',
-                layout: 'vertical',
-                contents: [
-                  { type: 'text', text: 'ข้อมูลที่คุณกรอก', weight: 'bold', size: 'lg' },
-                  { type: 'text', text: `ค่าน้ำตาล: ${userInputs[userId].sugarLevel}` },
-                  { type: 'text', text: `ค่าความดัน: ${userInputs[userId].bloodPressure}` },
-                  { type: 'text', text: `น้ำหนัก: ${userInputs[userId].weight}` },
-                  { type: 'text', text: `ส่วนสูง: ${userInputs[userId].height}` },
-                ],
-              },
-            },
-          };
-
-          await client.replyMessage(event.replyToken, [
-            flexMessage,
-            { type: 'text', text: 'กำลังประมวลผล รอสักครู่...' },
-          ]);
-
-          // บันทึกข้อมูลลงใน Google Sheets
-          console.log(`Sending data to Google Sheets for user ${userId}`);
-          await axios.post(googleScriptUrl, {
-            userId: userId,
-            sugarLevel: userInputs[userId].sugarLevel,
-            bloodPressure: userInputs[userId].bloodPressure,
-            weight: userInputs[userId].weight,
-            height: userInputs[userId].height,
-            timestamp: new Date().toLocaleString(),
-          });
-
-          // ส่งสติ๊กเกอร์ตอบกลับเมื่อบันทึกข้อมูลเสร็จ
-          await client.pushMessage(userId, {
-            type: 'sticker',
-            packageId: '1',
-            stickerId: '1',
-          });
-
-          console.log(`Data processing complete for user ${userId}`);
-
-          // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
-          delete userInputs[userId];
-        }
-      } catch (error) {
-        console.error('Error during user input processing:', error);
-      }
+    } else {
+      // Message format error
+      return client.replyMessage(event.replyToken, {
+        type: 'text',
+        text: 'กรุณาพิมพ์ข้อมูลในรูปแบบ: "ค่าน้ำตาล XX ค่าความดัน YY" (เช่น "ค่าน้ำตาล 90 ค่าความดัน 120")',
+      });
     }
   }
   return Promise.resolve(null);
