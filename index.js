@@ -1,3 +1,32 @@
+const express = require('express');
+const line = require('@line/bot-sdk');
+const axios = require('axios');
+
+const app = express();
+app.use(express.json());
+
+// Load environment variables (ใช้เฉพาะในเครื่องท้องถิ่นเท่านั้น)
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
+
+const config = {
+  channelAccessToken: process.env.LINE_CHANNEL_ACCESS_TOKEN,
+  channelSecret: process.env.LINE_CHANNEL_SECRET,
+};
+
+const client = new line.Client(config);
+
+let userInputs = {}; // ใช้เก็บข้อมูลผู้ใช้ชั่วคราว
+
+app.post('/webhook', line.middleware(config), (req, res) => {
+  const events = req.body.events;
+  events.forEach((event) => {
+    handleEvent(event);
+  });
+  res.status(200).send('OK');
+});
+
 function handleEvent(event) {
   const userId = event.source.userId;
 
@@ -85,3 +114,8 @@ function handleEvent(event) {
     }
   }
 }
+
+const port = process.env.PORT || 3000;
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
