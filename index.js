@@ -19,6 +19,11 @@ const client = new line.Client(config);
 
 let userInputs = {}; // ใช้เก็บข้อมูลผู้ใช้ชั่วคราว
 
+// เพิ่ม route สำหรับการตอบสนอง GET ที่ root URL
+app.get('/', (req, res) => {
+  res.send('Hello! This is the LINE Bot Health Check server.');
+});
+
 app.post('/webhook', line.middleware(config), (req, res) => {
   const events = req.body.events;
   Promise.all(events.map(handleEvent))
