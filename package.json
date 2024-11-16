@@ -1,0 +1,16 @@
+{
+  "name": "line-bot-health-check",
+  "version": "1.0.0",
+  "description": "A LINE bot for health data collection",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "express": "^4.17.1",
+    "body-parser": "^1.19.0",
+    "@line/bot-sdk": "^7.4.0",
+    "axios": "^0.21.1",
+    "dotenv": "^10.0.0"
+  }
+}
