@@ -29,15 +29,15 @@ app.post('/webhook', middleware(config), (req, res) => {
     });
 });
 
-function handleEvent(event) {
+async function handleEvent(event) {
   const userId = event.source.userId;
 
-  // เริ่มต้นการกรอกข้อมูลจากผู้ใช้
+  // ตรวจสอบว่าเป็นข้อความจากผู้ใช้หรือไม่
   if (event.type === 'message' && event.message.type === 'text') {
-    const userInput = event.message.text;
+    const userInput = event.message.text.trim();
 
+    // เริ่มต้นการกรอกข้อมูลจากผู้ใช้
     if (userInput === 'เริ่มต้นกรอกข้อมูล') {
-      // เริ่มต้นขั้นตอนการกรอกข้อมูล
       userInputs[userId] = { step: 1 };
       return client.replyMessage(event.replyToken, {
         type: 'text',
@@ -45,7 +45,7 @@ function handleEvent(event) {
       });
     }
 
-    // ตรวจสอบว่าอยู่ในขั้นตอนการกรอกข้อมูลหรือไม่
+    // ตรวจสอบขั้นตอนการกรอกข้อมูล
     if (userInputs[userId]) {
       if (userInputs[userId].step === 1) {
         userInputs[userId].sugarLevel = userInput;
@@ -70,7 +70,6 @@ function handleEvent(event) {
         });
       } else if (userInputs[userId].step === 4) {
         userInputs[userId].height = userInput;
-        userInputs[userId].step = 5;
 
         // สร้าง Flex Message เพื่อแสดงข้อมูลทั้งหมด
         const flexMessage = {
@@ -92,13 +91,15 @@ function handleEvent(event) {
           },
         };
 
-        client.replyMessage(event.replyToken, [
-          flexMessage,
-          { type: 'text', text: 'กำลังประมวลผล รอสักครู่...' },
-        ])
-        .then(() => {
+        // ส่ง Flex Message และข้อความแจ้งเตือนการประมวลผล
+        try {
+          await client.replyMessage(event.replyToken, [
+            flexMessage,
+            { type: 'text', text: 'กำลังประมวลผล รอสักครู่...' },
+          ]);
+
           // บันทึกข้อมูลลงใน Google Sheets
-          return axios.post(googleScriptUrl, {
+          await axios.post(googleScriptUrl, {
             userId: userId,
             sugarLevel: userInputs[userId].sugarLevel,
             bloodPressure: userInputs[userId].bloodPressure,
@@ -106,22 +107,19 @@ function handleEvent(event) {
             height: userInputs[userId].height,
             timestamp: new Date().toLocaleString(),
           });
-        })
-        .then(() => {
+
           // ส่งสติ๊กเกอร์ตอบกลับเมื่อบันทึกข้อมูลเสร็จ
-          return client.pushMessage(userId, {
+          await client.pushMessage(userId, {
             type: 'sticker',
             packageId: '1',
             stickerId: '1',
           });
-        })
-        .catch((err) => {
-          console.error('Error processing user input or sending data:', err);
-        })
-        .finally(() => {
+
           // ล้างข้อมูลผู้ใช้หลังจากประมวลผลเสร็จ
           delete userInputs[userId];
-        });
+        } catch (error) {
+          console.error('Error processing user input or sending data:', error);
+        }
       }
     }
   }
